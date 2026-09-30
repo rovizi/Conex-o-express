@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 import requests
 from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel
@@ -36,13 +37,13 @@ STATUS_CONFIG = {
 
 class PedidoCreateSchema(BaseModel):
     pedido_id: str
-    status: str = "aguardando_pagamento"
-    codigo_rastreio: str = None  # type: ignore
+    status: Optional[str] = "aguardando_pagamento"
+    codigo_rastreio: Optional[str] = None
 
 class WebhookAutoSchema(BaseModel):
     status: str
-    codigo_rastreio: str = None  # type: ignore
-    local_atual: str = None  # type: ignore
+    codigo_rastreio: Optional[str] = None
+    local_atual: Optional[str] = None
 
 @app.get("/", summary="Status da API e Loja Vazia")
 def home(db: Session = Depends(get_db)):
