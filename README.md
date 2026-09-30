@@ -1,0 +1,1 @@
+API de rastreamento automatizado e central de entregas da Conexão Gamer (Serviço Conexão Express). Desenvolvida em FastAPI com integração nativa ao Melhor Envio, banco de dados SQLite e interface visual com rastreio em etapas e ícone customizado de caminhão.
