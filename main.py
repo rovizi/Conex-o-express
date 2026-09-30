@@ -37,12 +37,12 @@ STATUS_CONFIG = {
 class PedidoCreateSchema(BaseModel):
     pedido_id: str
     status: str = "aguardando_pagamento"
-    codigo_rastreio: str = None
+    codigo_rastreio: str = None  # type: ignore
 
 class WebhookAutoSchema(BaseModel):
     status: str
-    codigo_rastreio: str = None
-    local_atual: str = None
+    codigo_rastreio: str = None  # type: ignore
+    local_atual: str = None  # type: ignore
 
 @app.get("/", summary="Status da API e Loja Vazia")
 def home(db: Session = Depends(get_db)):
