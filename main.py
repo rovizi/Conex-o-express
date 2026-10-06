@@ -11,8 +11,8 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Conexão Gamer - Conexão Express 100% Automático",
-    description="API de rastreamento automatizado com ícone customizado e controle de orientação do caminhãozinho",
-    version="2.3.0"
+    description="API de rastreamento com etapa de Aguardando (laranja) e fluxo ajustado",
+    version="2.4.0"
 )
 
 # ----------------------------------------------------
@@ -24,20 +24,22 @@ MELHOR_ENVIO_URL = "https://www.melhorenvio.com.br/api/v2/me/shipment/tracking"
 # Link oficial do caminhãozinho personalizado da Conexão Gamer
 CAMINHAO_ICONE_URL = "https://i.postimg.cc/7L9P6BLB/Rastreio-removebg-preview.png"
 
+# Adicionamos "aguardando" como a Etapa 1 na cor laranja, empurrando as demais sequências
 STATUS_CONFIG = {
-    "aguardando_pagamento": {"cor": "laranja", "etapa": 1, "descricao": "Aguardando Confirmação de Pagamento"},
-    "preparando_envio": {"cor": "laranja", "etapa": 2, "descricao": "Pagamento Aprovado - Separando o Pedido"},
-    "objeto_postado": {"cor": "azul", "etapa": 3, "descricao": "Objeto Postado na Transportadora"},
-    "em_transito": {"cor": "azul", "etapa": 4, "descricao": "Pacote em Trânsito rumo à sua cidade"},
-    "saiu_para_entrega": {"cor": "azul", "etapa": 5, "descricao": "Saiu para Entrega no seu endereço"},
-    "entregue": {"cor": "verde", "etapa": 6, "descricao": "Entregue com Sucesso"},
+    "aguardando": {"cor": "laranja", "etapa": 1, "descricao": "Aguardando Confirmação de Pedido / Compra Real"},
+    "aguardando_pagamento": {"cor": "laranja", "etapa": 2, "descricao": "Aguardando Confirmação de Pagamento"},
+    "preparando_envio": {"cor": "laranja", "etapa": 3, "descricao": "Pagamento Aprovado - Separando o Pedido"},
+    "objeto_postado": {"cor": "azul", "etapa": 4, "descricao": "Objeto Postado na Transportadora"},
+    "em_transito": {"cor": "azul", "etapa": 5, "descricao": "Pacote em Trânsito rumo à sua cidade"},
+    "saiu_para_entrega": {"cor": "azul", "etapa": 6, "descricao": "Saiu para Entrega no seu endereço"},
+    "entregue": {"cor": "verde", "etapa": 7, "descricao": "Entregue com Sucesso"},
     "pacote_recusado": {"cor": "vermelho", "etapa": 0, "descricao": "Pacote Recusado"},
     "problema_entrega": {"cor": "vermelho", "etapa": 0, "descricao": "Problema na Entrega"}
 }
 
 class PedidoCreateSchema(BaseModel):
     pedido_id: str
-    status: Optional[str] = "aguardando_pagamento"
+    status: Optional[str] = "aguardando"
     codigo_rastreio: Optional[str] = None
 
 class WebhookAutoSchema(BaseModel):
@@ -71,13 +73,13 @@ def criar_pedido(dados: PedidoCreateSchema, db: Session = Depends(get_db)):
     if existente:
         return {"mensagem": "Pedido já cadastrado.", "pedido": existente}
 
-    status_inicial = dados.status if dados.status in STATUS_CONFIG else "aguardando_pagamento"
+    status_inicial = dados.status if dados.status in STATUS_CONFIG else "aguardando"
 
     novo_pedido = models.PedidoRastreioModel(
         pedido_id=dados.pedido_id,
         status=status_inicial,
         codigo_rastreio=dados.codigo_rastreio,
-        local_atual="Aguardando liberação de compra real",
+        local_atual="Aguardando compra real",
         ultima_atualizacao=agora
     )
     db.add(novo_pedido)
@@ -126,9 +128,9 @@ def consultar_rastreio(pedido_id: str, db: Session = Depends(get_db)):
         except Exception:
             pass
 
-    config_atual = STATUS_CONFIG.get(pedido.status, STATUS_CONFIG["aguardando_pagamento"])
+    config_atual = STATUS_CONFIG.get(pedido.status, STATUS_CONFIG["aguardando"])
 
-    # Força o caminhão a ficar virado da esquerda para a direita (scaleX(1)) na etapa 1 (aguardando)
+    # Mantém o caminhão virado da esquerda para a direita (scaleX(1))
     estilo_caminhao = "transform: scaleX(1);"
 
     return {
