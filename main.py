@@ -11,8 +11,8 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Conexão Gamer - Conexão Express 100% Automático",
-    description="API de rastreamento com etapa de Aguardando (laranja) e fluxo ajustado",
-    version="2.4.0"
+    description="API com estado de repouso: Aguardando Dados (Laranja) -> Pagamento -> Preparação...",
+    version="2.7.0"
 )
 
 # ----------------------------------------------------
@@ -24,22 +24,73 @@ MELHOR_ENVIO_URL = "https://www.melhorenvio.com.br/api/v2/me/shipment/tracking"
 # Link oficial do caminhãozinho personalizado da Conexão Gamer
 CAMINHAO_ICONE_URL = "https://i.postimg.cc/7L9P6BLB/Rastreio-removebg-preview.png"
 
-# Adicionamos "aguardando" como a Etapa 1 na cor laranja, empurrando as demais sequências
+# Mapeamento oficial de status com o estado "aguardando_dados"
 STATUS_CONFIG = {
-    "aguardando": {"cor": "laranja", "etapa": 1, "descricao": "Aguardando Confirmação de Pedido / Compra Real"},
-    "aguardando_pagamento": {"cor": "laranja", "etapa": 2, "descricao": "Aguardando Confirmação de Pagamento"},
-    "preparando_envio": {"cor": "laranja", "etapa": 3, "descricao": "Pagamento Aprovado - Separando o Pedido"},
-    "objeto_postado": {"cor": "azul", "etapa": 4, "descricao": "Objeto Postado na Transportadora"},
-    "em_transito": {"cor": "azul", "etapa": 5, "descricao": "Pacote em Trânsito rumo à sua cidade"},
-    "saiu_para_entrega": {"cor": "azul", "etapa": 6, "descricao": "Saiu para Entrega no seu endereço"},
-    "entregue": {"cor": "verde", "etapa": 7, "descricao": "Entregue com Sucesso"},
-    "pacote_recusado": {"cor": "vermelho", "etapa": 0, "descricao": "Pacote Recusado"},
-    "problema_entrega": {"cor": "vermelho", "etapa": 0, "descricao": "Problema na Entrega"}
+    "aguardando_dados": {
+        "cor": "laranja", 
+        "etapa": 0, 
+        "rotulo": "AGUARDANDO DADOS", 
+        "descricao": "Sistema em repouso - Nenhuma compra ou pagamento no momento"
+    },
+    "aguardando_pagamento": {
+        "cor": "laranja", 
+        "etapa": 1, 
+        "rotulo": "AGUARDANDO", 
+        "descricao": "Aguardando Confirmação de Pagamento"
+    },
+    "pagamento_aprovado": {
+        "cor": "verde", 
+        "etapa": 2, 
+        "rotulo": "PAGO", 
+        "descricao": "Pagamento Aprovado com Sucesso"
+    },
+    "preparando_envio": {
+        "cor": "azul", 
+        "etapa": 3, 
+        "rotulo": "PREPARAÇÃO", 
+        "descricao": "Pagamento Aprovado - Separando o Pedido"
+    },
+    "objeto_postado": {
+        "cor": "azul", 
+        "etapa": 4, 
+        "rotulo": "POSTADO", 
+        "descricao": "Objeto Postado na Transportadora"
+    },
+    "em_transito": {
+        "cor": "azul", 
+        "etapa": 5, 
+        "rotulo": "EM TRÂNSITO", 
+        "descricao": "Pacote em Trânsito rumo à sua cidade"
+    },
+    "saiu_para_entrega": {
+        "cor": "azul", 
+        "etapa": 6, 
+        "rotulo": "EM ROTA", 
+        "descricao": "Saiu para Entrega no seu endereço"
+    },
+    "entregue": {
+        "cor": "verde", 
+        "etapa": 7, 
+        "rotulo": "ENTREGUE", 
+        "descricao": "Entregue com Sucesso"
+    },
+    "pacote_recusado": {
+        "cor": "vermelho", 
+        "etapa": -1, 
+        "rotulo": "RECUSADO", 
+        "descricao": "Pacote Recusado"
+    },
+    "problema_entrega": {
+        "cor": "vermelho", 
+        "etapa": -1, 
+        "rotulo": "PROBLEMA", 
+        "descricao": "Problema na Entrega"
+    }
 }
 
 class PedidoCreateSchema(BaseModel):
     pedido_id: str
-    status: Optional[str] = "aguardando"
+    status: Optional[str] = "aguardando_pagamento"
     codigo_rastreio: Optional[str] = None
 
 class WebhookAutoSchema(BaseModel):
@@ -47,16 +98,23 @@ class WebhookAutoSchema(BaseModel):
     codigo_rastreio: Optional[str] = None
     local_atual: Optional[str] = None
 
-@app.get("/", summary="Status da API e Loja Vazia")
+@app.get("/", summary="Status da API e Estado de Aguardando Dados")
 def home(db: Session = Depends(get_db)):
     total_pedidos = db.query(models.PedidoRastreioModel).count()
     if total_pedidos == 0:
+        # Retorna o modelo exato para a interface exibir o botão laranja "Aguardando Dados"
         return {
-            "loja": "Conexão Gamer",
-            "servico_envio": "Conexão Express",
-            "status_api": "Online e 100% Automático 🚀",
-            "status_loja": "Nenhum pedido registrado no momento",
-            "mensagem": "Aguardando os pedidos entrarem automaticamente!"
+            "pedido_id": "geral",
+            "servico": "Conexão Express",
+            "codigo_rastreio": None,
+            "status_atual": "aguardando_dados",
+            "rotulo_etapa": STATUS_CONFIG["aguardando_dados"]["rotulo"],
+            "descricao_status": STATUS_CONFIG["aguardando_dados"]["descricao"],
+            "cor": STATUS_CONFIG["aguardando_dados"]["cor"],
+            "progresso_etapa": STATUS_CONFIG["aguardando_dados"]["etapa"],
+            "icone_caminhao": CAMINHAO_ICONE_URL,
+            "local_atual": "Aguardando dados de novos pedidos",
+            "ultima_atualizacao": datetime.now().strftime("%d/%m/%Y %H:%M")
         }
     return {
         "loja": "Conexão Gamer",
@@ -73,13 +131,13 @@ def criar_pedido(dados: PedidoCreateSchema, db: Session = Depends(get_db)):
     if existente:
         return {"mensagem": "Pedido já cadastrado.", "pedido": existente}
 
-    status_inicial = dados.status if dados.status in STATUS_CONFIG else "aguardando"
+    status_inicial = dados.status if dados.status in STATUS_CONFIG else "aguardando_pagamento"
 
     novo_pedido = models.PedidoRastreioModel(
         pedido_id=dados.pedido_id,
         status=status_inicial,
         codigo_rastreio=dados.codigo_rastreio,
-        local_atual="Aguardando compra real",
+        local_atual="Aguardando liberação de pagamento real",
         ultima_atualizacao=agora
     )
     db.add(novo_pedido)
@@ -128,21 +186,18 @@ def consultar_rastreio(pedido_id: str, db: Session = Depends(get_db)):
         except Exception:
             pass
 
-    config_atual = STATUS_CONFIG.get(pedido.status, STATUS_CONFIG["aguardando"])
-
-    # Mantém o caminhão virado da esquerda para a direita (scaleX(1))
-    estilo_caminhao = "transform: scaleX(1);"
+    config_atual = STATUS_CONFIG.get(pedido.status, STATUS_CONFIG["aguardando_dados"])
 
     return {
         "pedido_id": pedido.pedido_id,
         "servico": "Conexão Express",
         "codigo_rastreio": pedido.codigo_rastreio,
         "status_atual": pedido.status,
+        "rotulo_etapa": config_atual["rotulo"],
         "descricao_status": config_atual["descricao"],
         "cor": config_atual["cor"],
         "progresso_etapa": config_atual["etapa"],
         "icone_caminhao": CAMINHAO_ICONE_URL,
-        "icone_estilo": estilo_caminhao,
         "local_atual": pedido.local_atual,
         "ultima_atualizacao": pedido.ultima_atualizacao,
         "fluxo_status": list(STATUS_CONFIG.keys())
