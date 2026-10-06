@@ -2,16 +2,26 @@ from datetime import datetime
 from typing import Optional
 import requests
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from database import engine, get_db, SessionLocal
 import models
 
-# 1. PRIMEIRO DE TUDO: Inicializa o aplicativo FastAPI
+# 1. Inicializa o aplicativo FastAPI
 app = FastAPI(
     title="Conexão Gamer - Conexão Express 100% Automático",
-    description="API com estado de repouso: Aguardando Dados (Laranja) -> Pagamento -> Preparação...",
-    version="2.8.0"
+    description="API com CORS liberado e estado de repouso: Aguardando Dados (Laranja)",
+    version="2.9.0"
+)
+
+# 2. CONFIGURAÇÃO DE CORS (Essencial para o front-end conectar sem erros)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Permite conexões de qualquer origem (loja, painel, etc.)
+    allow_credentials=True,
+    allow_methods=["*"],  # Permite GET, POST, PUT, OPTIONS, etc.
+    allow_headers=["*"],  # Permite todos os headers
 )
 
 models.Base.metadata.create_all(bind=engine)
