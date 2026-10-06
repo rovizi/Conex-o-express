@@ -12,7 +12,7 @@ import models
 app = FastAPI(
     title="Conexão Gamer - Conexão Express 100% Automático",
     description="API com sincronização perfeita entre texto e etapas de rastreio",
-    version="3.1.0"
+    version="3.2.0"
 )
 
 # 2. CONFIGURAÇÃO DE CORS
@@ -180,23 +180,24 @@ def webhook_atualizar(pedido_id: str, dados: WebhookAutoSchema, db: Session = De
 
 @app.get("/api/rastreio/{pedido_id}", summary="Consulta de rastreio sincronizada")
 def consultar_rastreio(pedido_id: str, db: Session = Depends(get_db)):
-    # Busca por ID ou por código de rastreio para flexibilizar a busca do cliente
+    # Busca estrita pelo ID do pedido ou pelo código de rastreio real cadastrado
     pedido = db.query(models.PedidoRastreioModel).filter(
         (models.PedidoRastreioModel.pedido_id == pedido_id) | 
         (models.PedidoRastreioModel.codigo_rastreio == pedido_id)
     ).first()
     
+    # Se não encontrar na base, força o estado absoluto de repouso (etapa 0)
     if not pedido:
         config_padrao = STATUS_CONFIG["aguardando_dados"]
         return {
             "pedido_id": pedido_id,
             "servico": "Conexão Express",
-            "codigo_rastreio": pedido_id if len(pedido_id) > 5 else None,
+            "codigo_rastreio": None,  # Zera o código para não exibir lixo na tela
             "status_atual": "aguardando_dados",
             "rotulo_etapa": config_padrao["rotulo"],
-            "descricao_status": "Sistema em repouso - Nenhuma compra ou pagamento no momento",
+            "descricao_status": config_padrao["descricao"],
             "cor": config_padrao["cor"],
-            "progresso_etapa": config_padrao["etapa"],
+            "progresso_etapa": config_padrao["etapa"],  # Força etapa 0
             "icone_caminhao": CAMINHAO_ICONE_URL,
             "local_atual": "Aguardando dados de novos pedidos",
             "ultima_atualizacao": datetime.now().strftime("%d/%m/%Y %H:%M"),
