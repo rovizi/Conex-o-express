@@ -12,7 +12,7 @@ models.Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="Conexão Gamer - Conexão Express 100% Automático",
     description="API de rastreamento automatizado com ícone customizado e controle de orientação do caminhãozinho",
-    version="2.2.0"
+    version="2.3.0"
 )
 
 # ----------------------------------------------------
@@ -77,7 +77,7 @@ def criar_pedido(dados: PedidoCreateSchema, db: Session = Depends(get_db)):
         pedido_id=dados.pedido_id,
         status=status_inicial,
         codigo_rastreio=dados.codigo_rastreio,
-        local_atual="Aguardando liberação automática",
+        local_atual="Aguardando liberação de compra real",
         ultima_atualizacao=agora
     )
     db.add(novo_pedido)
@@ -128,8 +128,8 @@ def consultar_rastreio(pedido_id: str, db: Session = Depends(get_db)):
 
     config_atual = STATUS_CONFIG.get(pedido.status, STATUS_CONFIG["aguardando_pagamento"])
 
-    # Define se o caminhão precisa estar invertido (scaleX(-1) para espelhar) com base na direção desejada
-    estilo_caminhao = "transform: scaleX(-1);" if config_atual["etapa"] == 1 else "transform: scaleX(1);"
+    # Força o caminhão a ficar virado da esquerda para a direita (scaleX(1)) na etapa 1 (aguardando)
+    estilo_caminhao = "transform: scaleX(1);"
 
     return {
         "pedido_id": pedido.pedido_id,
