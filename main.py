@@ -1,4 +1,5 @@
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from typing import Optional
 import requests
 from fastapi import Depends, FastAPI, HTTPException
@@ -25,6 +26,9 @@ app.add_middleware(
 )
 
 models.Base.metadata.create_all(bind=engine)
+
+# Fuso horário oficial de Brasília
+FUSO_BRASILIA = ZoneInfo("America/Sao_Paulo")
 
 # ----------------------------------------------------
 # TOKEN DE PRODUÇÃO DO MELHOR ENVIO CONFIGURADO:
@@ -124,7 +128,7 @@ def home(db: Session = Depends(get_db)):
             "progresso_etapa": STATUS_CONFIG["aguardando_dados"]["etapa"],
             "icone_caminhao": CAMINHAO_ICONE_URL,
             "local_atual": "Aguardando dados de novos pedidos",
-            "ultima_atualizacao": datetime.now().strftime("%d/%m/%Y %H:%M")
+            "ultima_atualizacao": datetime.now(FUSO_BRASILIA).strftime("%d/%m/%Y %H:%M")
         }
     return {
         "loja": "Conexão Gamer",
@@ -135,7 +139,7 @@ def home(db: Session = Depends(get_db)):
 
 @app.post("/api/pedidos", summary="Registro automático de novo pedido")
 def criar_pedido(dados: PedidoCreateSchema, db: Session = Depends(get_db)):
-    agora = datetime.now().strftime("%d/%m/%Y %H:%M")
+    agora = datetime.now(FUSO_BRASILIA).strftime("%d/%m/%Y %H:%M")
     
     existente = db.query(models.PedidoRastreioModel).filter_by(pedido_id=dados.pedido_id).first()
     if existente:
@@ -157,7 +161,7 @@ def criar_pedido(dados: PedidoCreateSchema, db: Session = Depends(get_db)):
 
 @app.post("/api/webhook/atualizar/{pedido_id}", summary="Webhook Universal para automação total")
 def webhook_atualizar(pedido_id: str, dados: WebhookAutoSchema, db: Session = Depends(get_db)):
-    agora = datetime.now().strftime("%d/%m/%Y %H:%M")
+    agora = datetime.now(FUSO_BRASILIA).strftime("%d/%m/%Y %H:%M")
     pedido = db.query(models.PedidoRastreioModel).filter_by(pedido_id=pedido_id).first()
     
     if not pedido:
@@ -200,7 +204,7 @@ def consultar_rastreio(pedido_id: str, db: Session = Depends(get_db)):
             "progresso_etapa": config_padrao["etapa"],  # Força etapa 0
             "icone_caminhao": CAMINHAO_ICONE_URL,
             "local_atual": "Aguardando dados de novos pedidos",
-            "ultima_atualizacao": datetime.now().strftime("%d/%m/%Y %H:%M"),
+            "ultima_atualizacao": datetime.now(FUSO_BRASILIA).strftime("%d/%m/%Y %H:%M"),
             "fluxo_status": list(STATUS_CONFIG.keys())
         }
 
