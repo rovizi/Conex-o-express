@@ -11,8 +11,8 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Conexão Gamer - Conexão Express 100% Automático",
-    description="API de rastreamento automatizado com ícone customizado do caminhãozinho para a Conexão Gamer",
-    version="2.1.0"
+    description="API de rastreamento automatizado com ícone customizado e controle de orientação do caminhãozinho",
+    version="2.2.0"
 )
 
 # ----------------------------------------------------
@@ -21,7 +21,7 @@ app = FastAPI(
 MELHOR_ENVIO_TOKEN = "DptdWwqDDtoyZAjGaPmxpioaklKJbfKED4dn7F87"
 MELHOR_ENVIO_URL = "https://www.melhorenvio.com.br/api/v2/me/shipment/tracking"
 
-# Link oficial do caminhãozinho personalizado da Conexão Gamer (128x128 com fundo transparente)
+# Link oficial do caminhãozinho personalizado da Conexão Gamer
 CAMINHAO_ICONE_URL = "https://i.postimg.cc/7L9P6BLB/Rastreio-removebg-preview.png"
 
 STATUS_CONFIG = {
@@ -128,6 +128,9 @@ def consultar_rastreio(pedido_id: str, db: Session = Depends(get_db)):
 
     config_atual = STATUS_CONFIG.get(pedido.status, STATUS_CONFIG["aguardando_pagamento"])
 
+    # Define se o caminhão precisa estar invertido (scaleX(-1) para espelhar) com base na direção desejada
+    estilo_caminhao = "transform: scaleX(-1);" if config_atual["etapa"] == 1 else "transform: scaleX(1);"
+
     return {
         "pedido_id": pedido.pedido_id,
         "servico": "Conexão Express",
@@ -137,6 +140,7 @@ def consultar_rastreio(pedido_id: str, db: Session = Depends(get_db)):
         "cor": config_atual["cor"],
         "progresso_etapa": config_atual["etapa"],
         "icone_caminhao": CAMINHAO_ICONE_URL,
+        "icone_estilo": estilo_caminhao,
         "local_atual": pedido.local_atual,
         "ultima_atualizacao": pedido.ultima_atualizacao,
         "fluxo_status": list(STATUS_CONFIG.keys())
