@@ -11,17 +11,17 @@ import models
 # 1. Inicializa o aplicativo FastAPI
 app = FastAPI(
     title="Conexão Gamer - Conexão Express 100% Automático",
-    description="API com CORS liberado e estado de repouso: Aguardando Dados (Laranja)",
-    version="2.9.0"
+    description="API com CORS liberado e fallback inteligente para rastreio",
+    version="3.0.0"
 )
 
-# 2. CONFIGURAÇÃO DE CORS (Essencial para o front-end conectar sem erros)
+# 2. CONFIGURAÇÃO DE CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Permite conexões de qualquer origem (loja, painel, etc.)
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # Permite GET, POST, PUT, OPTIONS, etc.
-    allow_headers=["*"],  # Permite todos os headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 models.Base.metadata.create_all(bind=engine)
@@ -178,12 +178,27 @@ def webhook_atualizar(pedido_id: str, dados: WebhookAutoSchema, db: Session = De
     
     return {"mensagem": "Status atualizado 100% automaticamente!", "pedido": pedido}
 
-@app.get("/api/rastreio/{pedido_id}", summary="Consulta de rastreio visual para o cliente")
+@app.get("/api/rastreio/{pedido_id}", summary="Consulta de rastreio visual para o cliente com fallback inteligente")
 def consultar_rastreio(pedido_id: str, db: Session = Depends(get_db)):
     pedido = db.query(models.PedidoRastreioModel).filter_by(pedido_id=pedido_id).first()
     
+    # Se o pedido não estiver cadastrado no banco, retornamos o estado "aguardando_dados" graciosamente
     if not pedido:
-        raise HTTPException(status_code=404, detail="Pedido não encontrado.")
+        config_padrao = STATUS_CONFIG["aguardando_dados"]
+        return {
+            "pedido_id": pedido_id,
+            "servico": "Conexão Express",
+            "codigo_rastreio": None,
+            "status_atual": "aguardando_dados",
+            "rotulo_etapa": config_padrao["rotulo"],
+            "descricao_status": "Pedido não localizado na base - Aguardando novos dados",
+            "cor": config_padrao["cor"],
+            "progresso_etapa": config_padrao["etapa"],
+            "icone_caminhao": CAMINHAO_ICONE_URL,
+            "local_atual": "Aguardando sincronização do pedido",
+            "ultima_atualizacao": datetime.now().strftime("%d/%m/%Y %H:%M"),
+            "fluxo_status": list(STATUS_CONFIG.keys())
+        }
 
     if pedido.codigo_rastreio and pedido.status not in ["entregue", "pacote_recusado", "problema_entrega"]:
         try:
