@@ -37,7 +37,7 @@ MELHOR_ENVIO_TOKEN = "DptdWwqDDtoyZAjGaPmxpioaklKJbfKED4dn7F87"
 MELHOR_ENVIO_URL = "https://www.melhorenvio.com.br/api/v2/me/shipment/tracking"
 
 # Link oficial do caminhãozinho personalizado da Conexão Gamer
-CAMINHAO_ICONE_URL = "https://i.postimg.cc/7L9P6BLB/Rastreio-removebg-preview.png"
+CAMINHAO_ICONE_URL = "https://i.postimg.cc/pr5GB6CW/caminhao.jpg"
 
 # Mapeamento oficial de status com o estado "aguardando_dados"
 STATUS_CONFIG = {
