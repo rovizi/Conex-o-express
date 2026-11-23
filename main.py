@@ -1,19 +1,22 @@
+import os
 from datetime import datetime
-from zoneinfo import ZoneInfo
 from typing import Optional
-import requests
+from zoneinfo import ZoneInfo
+
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import requests
 from sqlalchemy.orm import Session
-from database import engine, get_db, SessionLocal
+
+from database import SessionLocal, engine, get_db
 import models
 
 # 1. Inicializa o aplicativo FastAPI
 app = FastAPI(
     title="Conexão Gamer - Conexão Express 100% Automático",
     description="API com sincronização perfeita entre texto e etapas de rastreio",
-    version="3.2.0"
+    version="3.2.0",
 )
 
 # 2. CONFIGURAÇÃO DE CORS
@@ -31,9 +34,12 @@ models.Base.metadata.create_all(bind=engine)
 FUSO_BRASILIA = ZoneInfo("America/Sao_Paulo")
 
 # ----------------------------------------------------
-# TOKEN DE PRODUÇÃO DO MELHOR ENVIO CONFIGURADO:
+# CONFIGURAÇÃO DO MELHOR ENVIO VIA VARIÁVEIS DE AMBIENTE
 # ----------------------------------------------------
-MELHOR_ENVIO_TOKEN = "DptdWwqDDtoyZAjGaPmxpioaklKJbfKED4dn7F87"
+MELHOR_ENVIO_TOKEN = os.getenv("MELHOR_ENVIO_TOKEN", "")
+MELHOR_ENVIO_USER_AGENT = os.getenv(
+    "MELHOR_ENVIO_USER_AGENT", "ConexaoExpress (contato@conexaogamer.com.br)"
+)
 MELHOR_ENVIO_URL = "https://www.melhorenvio.com.br/api/v2/me/shipment/tracking"
 
 # Link oficial do caminhãozinho personalizado da Conexão Gamer
@@ -42,196 +48,246 @@ CAMINHAO_ICONE_URL = "https://i.postimg.cc/pr5GB6CW/caminhao.jpg"
 # Mapeamento oficial de status com o estado "aguardando_dados"
 STATUS_CONFIG = {
     "aguardando_dados": {
-        "cor": "laranja", 
-        "etapa": 0, 
-        "rotulo": "AGUARDANDO DADOS", 
-        "descricao": "Sistema em repouso - Nenhuma compra ou pagamento no momento"
+        "cor": "laranja",
+        "etapa": 0,
+        "rotulo": "AGUARDANDO DADOS",
+        "descricao": "Sistema em repouso - Nenhuma compra ou pagamento no momento",
     },
     "aguardando_pagamento": {
-        "cor": "laranja", 
-        "etapa": 1, 
-        "rotulo": "AGUARDANDO", 
-        "descricao": "Aguardando Confirmação de Pagamento"
+        "cor": "laranja",
+        "etapa": 1,
+        "rotulo": "AGUARDANDO",
+        "descricao": "Aguardando Confirmação de Pagamento",
     },
     "pagamento_aprovado": {
-        "cor": "verde", 
-        "etapa": 2, 
-        "rotulo": "PAGO", 
-        "descricao": "Pagamento Aprovado com Sucesso"
+        "cor": "verde",
+        "etapa": 2,
+        "rotulo": "PAGO",
+        "descricao": "Pagamento Aprovado com Sucesso",
     },
     "preparando_envio": {
-        "cor": "azul", 
-        "etapa": 3, 
-        "rotulo": "PREPARAÇÃO", 
-        "descricao": "Pagamento Aprovado - Separando o Pedido"
+        "cor": "azul",
+        "etapa": 3,
+        "rotulo": "PREPARAÇÃO",
+        "descricao": "Pagamento Aprovado - Separando o Pedido",
     },
     "objeto_postado": {
-        "cor": "azul", 
-        "etapa": 4, 
-        "rotulo": "POSTADO", 
-        "descricao": "Objeto Postado na Transportadora"
+        "cor": "azul",
+        "etapa": 4,
+        "rotulo": "POSTADO",
+        "descricao": "Objeto Postado na Transportadora",
     },
     "em_transito": {
-        "cor": "azul", 
-        "etapa": 5, 
-        "rotulo": "EM TRÂNSITO", 
-        "descricao": "Pacote em Trânsito rumo à sua cidade"
+        "cor": "azul",
+        "etapa": 5,
+        "rotulo": "EM TRÂNSITO",
+        "descricao": "Pacote em Trânsito rumo à sua cidade",
     },
     "saiu_para_entrega": {
-        "cor": "azul", 
-        "etapa": 6, 
-        "rotulo": "EM ROTA", 
-        "descricao": "Saiu para Entrega no seu endereço"
+        "cor": "azul",
+        "etapa": 6,
+        "rotulo": "EM ROTA",
+        "descricao": "Saiu para Entrega no seu endereço",
     },
     "entregue": {
-        "cor": "verde", 
-        "etapa": 7, 
-        "rotulo": "ENTREGUE", 
-        "descricao": "Entregue com Sucesso"
+        "cor": "verde",
+        "etapa": 7,
+        "rotulo": "ENTREGUE",
+        "descricao": "Entregue com Sucesso",
     },
     "pacote_recusado": {
-        "cor": "vermelho", 
-        "etapa": -1, 
-        "rotulo": "RECUSADO", 
-        "descricao": "Pacote Recusado"
+        "cor": "vermelho",
+        "etapa": -1,
+        "rotulo": "RECUSADO",
+        "descricao": "Pacote Recusado",
     },
     "problema_entrega": {
-        "cor": "vermelho", 
-        "etapa": -1, 
-        "rotulo": "PROBLEMA", 
-        "descricao": "Problema na Entrega"
-    }
+        "cor": "vermelho",
+        "etapa": -1,
+        "rotulo": "PROBLEMA",
+        "descricao": "Problema na Entrega",
+    },
 }
 
+
 class PedidoCreateSchema(BaseModel):
-    pedido_id: str
-    status: Optional[str] = "aguardando_pagamento"
-    codigo_rastreio: Optional[str] = None
+  pedido_id: str
+  status: Optional[str] = "aguardando_pagamento"
+  codigo_rastreio: Optional[str] = None
+
 
 class WebhookAutoSchema(BaseModel):
-    status: str
-    codigo_rastreio: Optional[str] = None
-    local_atual: Optional[str] = None
+  status: str
+  codigo_rastreio: Optional[str] = None
+  local_atual: Optional[str] = None
+
 
 @app.get("/", summary="Status da API e Estado de Aguardando Dados")
 def home(db: Session = Depends(get_db)):
-    total_pedidos = db.query(models.PedidoRastreioModel).count()
-    if total_pedidos == 0:
-        return {
-            "pedido_id": "geral",
-            "servico": "Conexão Express",
-            "codigo_rastreio": None,
-            "status_atual": "aguardando_dados",
-            "rotulo_etapa": STATUS_CONFIG["aguardando_dados"]["rotulo"],
-            "descricao_status": STATUS_CONFIG["aguardando_dados"]["descricao"],
-            "cor": STATUS_CONFIG["aguardando_dados"]["cor"],
-            "progresso_etapa": STATUS_CONFIG["aguardando_dados"]["etapa"],
-            "icone_caminhao": CAMINHAO_ICONE_URL,
-            "local_atual": "Aguardando dados de novos pedidos",
-            "ultima_atualizacao": datetime.now(FUSO_BRASILIA).strftime("%d/%m/%Y %H:%M")
-        }
+  total_pedidos = db.query(models.PedidoRastreioModel).count()
+  if total_pedidos == 0:
     return {
-        "loja": "Conexão Gamer",
-        "servico_envio": "Conexão Express",
-        "status_api": "Online e operacional 🚀",
-        "pedidos_registrados": total_pedidos
+        "pedido_id": "geral",
+        "servico": "Conexão Express",
+        "codigo_rastreio": None,
+        "status_atual": "aguardando_dados",
+        "rotulo_etapa": STATUS_CONFIG["aguardando_dados"]["rotulo"],
+        "descricao_status": STATUS_CONFIG["aguardando_dados"]["descricao"],
+        "cor": STATUS_CONFIG["aguardando_dados"]["cor"],
+        "progresso_etapa": STATUS_CONFIG["aguardando_dados"]["etapa"],
+        "icone_caminhao": CAMINHAO_ICONE_URL,
+        "local_atual": "Aguardando dados de novos pedidos",
+        "ultima_atualizacao": datetime.now(FUSO_BRASILIA).strftime(
+            "%d/%m/%Y %H:%M"
+        ),
     }
+  return {
+      "loja": "Conexão Gamer",
+      "servico_envio": "Conexão Express",
+      "status_api": "Online e operacional 🚀",
+      "pedidos_registrados": total_pedidos,
+  }
+
 
 @app.post("/api/pedidos", summary="Registro automático de novo pedido")
 def criar_pedido(dados: PedidoCreateSchema, db: Session = Depends(get_db)):
-    agora = datetime.now(FUSO_BRASILIA).strftime("%d/%m/%Y %H:%M")
-    
-    existente = db.query(models.PedidoRastreioModel).filter_by(pedido_id=dados.pedido_id).first()
-    if existente:
-        return {"mensagem": "Pedido já cadastrado.", "pedido": existente}
+  agora = datetime.now(FUSO_BRASILIA).strftime("%d/%m/%Y %H:%M")
 
-    status_inicial = dados.status if dados.status in STATUS_CONFIG else "aguardando_pagamento"
+  existente = (
+      db.query(models.PedidoRastreioModel)
+      .filter_by(pedido_id=dados.pedido_id)
+      .first()
+  )
+  if existente:
+    return {"mensagem": "Pedido já cadastrado.", "pedido": existente}
 
-    novo_pedido = models.PedidoRastreioModel(
-        pedido_id=dados.pedido_id,
-        status=status_inicial,
-        codigo_rastreio=dados.codigo_rastreio,
-        local_atual="Aguardando liberação de pagamento real",
-        ultima_atualizacao=agora
+  status_inicial = (
+      dados.status if dados.status in STATUS_CONFIG else "aguardando_pagamento"
+  )
+
+  novo_pedido = models.PedidoRastreioModel(
+      pedido_id=dados.pedido_id,
+      status=status_inicial,
+      codigo_rastreio=dados.codigo_rastreio,
+      local_atual="Aguardando liberação de pagamento real",
+      ultima_atualizacao=agora,
+  )
+  db.add(novo_pedido)
+  db.commit()
+  db.refresh(novo_pedido)
+  return {"mensagem": "Pedido registrado com sucesso!", "pedido": novo_pedido}
+
+
+@app.post(
+    "/api/webhook/atualizar/{pedido_id}",
+    summary="Webhook Universal para automação total",
+)
+def webhook_atualizar(
+    pedido_id: str, dados: WebhookAutoSchema, db: Session = Depends(get_db)
+):
+  agora = datetime.now(FUSO_BRASILIA).strftime("%d/%m/%Y %H:%M")
+  pedido = (
+      db.query(models.PedidoRastreioModel)
+      .filter_by(pedido_id=pedido_id)
+      .first()
+  )
+
+  if not pedido:
+    raise HTTPException(
+        status_code=404,
+        detail="Pedido não encontrado para atualização automática.",
     )
-    db.add(novo_pedido)
-    db.commit()
-    db.refresh(novo_pedido)
-    return {"mensagem": "Pedido registrado com sucesso!", "pedido": novo_pedido}
 
-@app.post("/api/webhook/atualizar/{pedido_id}", summary="Webhook Universal para automação total")
-def webhook_atualizar(pedido_id: str, dados: WebhookAutoSchema, db: Session = Depends(get_db)):
-    agora = datetime.now(FUSO_BRASILIA).strftime("%d/%m/%Y %H:%M")
-    pedido = db.query(models.PedidoRastreioModel).filter_by(pedido_id=pedido_id).first()
-    
-    if not pedido:
-        raise HTTPException(status_code=404, detail="Pedido não encontrado para atualização automática.")
+  if dados.status not in STATUS_CONFIG:
+    raise HTTPException(status_code=400, detail="Status enviado é inválido.")
 
-    if dados.status not in STATUS_CONFIG:
-        raise HTTPException(status_code=400, detail="Status enviado é inválido.")
+  pedido.status = dados.status
+  if dados.codigo_rastreio:
+    pedido.codigo_rastreio = dados.codigo_rastreio
+  if dados.local_atual:
+    pedido.local_atual = dados.local_atual
 
-    pedido.status = dados.status
-    if dados.codigo_rastreio:
-        pedido.codigo_rastreio = dados.codigo_rastreio
-    if dados.local_atual:
-        pedido.local_atual = dados.local_atual
-        
-    pedido.ultima_atualizacao = agora
-    db.commit()
-    db.refresh(pedido)
-    
-    return {"mensagem": "Status atualizado 100% automaticamente!", "pedido": pedido}
+  pedido.ultima_atualizacao = agora
+  db.commit()
+  db.refresh(pedido)
+
+  return {
+      "mensagem": "Status atualizado 100% automaticamente!",
+      "pedido": pedido,
+  }
+
 
 @app.get("/api/rastreio/{pedido_id}", summary="Consulta de rastreio sincronizada")
 def consultar_rastreio(pedido_id: str, db: Session = Depends(get_db)):
-    # Busca estrita pelo ID do pedido ou pelo código de rastreio real cadastrado
-    pedido = db.query(models.PedidoRastreioModel).filter(
-        (models.PedidoRastreioModel.pedido_id == pedido_id) | 
-        (models.PedidoRastreioModel.codigo_rastreio == pedido_id)
-    ).first()
-    
-    # Se não encontrar na base, força o estado absoluto de repouso (etapa 0)
-    if not pedido:
-        config_padrao = STATUS_CONFIG["aguardando_dados"]
-        return {
-            "pedido_id": pedido_id,
-            "servico": "Conexão Express",
-            "codigo_rastreio": None,  # Zera o código para não exibir lixo na tela
-            "status_atual": "aguardando_dados",
-            "rotulo_etapa": config_padrao["rotulo"],
-            "descricao_status": config_padrao["descricao"],
-            "cor": config_padrao["cor"],
-            "progresso_etapa": config_padrao["etapa"],  # Força etapa 0
-            "icone_caminhao": CAMINHAO_ICONE_URL,
-            "local_atual": "Aguardando dados de novos pedidos",
-            "ultima_atualizacao": datetime.now(FUSO_BRASILIA).strftime("%d/%m/%Y %H:%M"),
-            "fluxo_status": list(STATUS_CONFIG.keys())
-        }
+  pedido = (
+      db.query(models.PedidoRastreioModel)
+      .filter(
+          (models.PedidoRastreioModel.pedido_id == pedido_id)
+          | (models.PedidoRastreioModel.codigo_rastreio == pedido_id)
+      )
+      .first()
+  )
 
-    if pedido.codigo_rastreio and pedido.status not in ["entregue", "pacote_recusado", "problema_entrega"]:
-        try:
-            headers = {
-                "Accept": "application/json",
-                "Authorization": f"Bearer {MELHOR_ENVIO_TOKEN}"
-            }
-            body = {"orders": [pedido.codigo_rastreio]}
-            requests.post(MELHOR_ENVIO_URL, json=body, headers=headers, timeout=5)
-        except Exception:
-            pass
-
-    config_atual = STATUS_CONFIG.get(pedido.status, STATUS_CONFIG["aguardando_dados"])
-
+  if not pedido:
+    config_padrao = STATUS_CONFIG["aguardando_dados"]
     return {
-        "pedido_id": pedido.pedido_id,
+        "pedido_id": pedido_id,
         "servico": "Conexão Express",
-        "codigo_rastreio": pedido.codigo_rastreio,
-        "status_atual": pedido.status,
-        "rotulo_etapa": config_atual["rotulo"],
-        "descricao_status": config_atual["descricao"],
-        "cor": config_atual["cor"],
-        "progresso_etapa": config_atual["etapa"],
+        "codigo_rastreio": None,
+        "status_atual": "aguardando_dados",
+        "rotulo_etapa": config_padrao["rotulo"],
+        "descricao_status": config_padrao["descricao"],
+        "cor": config_padrao["cor"],
+        "progresso_etapa": config_padrao["etapa"],
         "icone_caminhao": CAMINHAO_ICONE_URL,
-        "local_atual": pedido.local_atual,
-        "ultima_atualizacao": pedido.ultima_atualizacao,
-        "fluxo_status": list(STATUS_CONFIG.keys())
+        "local_atual": "Aguardando dados de novos pedidos",
+        "ultima_atualizacao": datetime.now(FUSO_BRASILIA).strftime(
+            "%d/%m/%Y %H:%M"
+        ),
+        "fluxo_status": list(STATUS_CONFIG.keys()),
     }
+
+  if (
+      pedido.codigo_rastreio
+      and pedido.status not in ["entregue", "pacote_recusado", "problema_entrega"]
+      and MELHOR_ENVIO_TOKEN
+  ):
+    try:
+      headers = {
+          "Accept": "application/json",
+          "Authorization": f"Bearer {MELHOR_ENVIO_TOKEN}",
+          "User-Agent": MELHOR_ENVIO_USER_AGENT,
+      }
+      body = {"orders": [pedido.codigo_rastreio]}
+      resp = requests.post(
+          MELHOR_ENVIO_URL, json=body, headers=headers, timeout=5
+      )
+      if resp.status_code >= 400:
+        print(
+            f"[Melhor Envio] Aviso ao consultar rastreio {pedido.pedido_id}:"
+            f" HTTP {resp.status_code}"
+        )
+    except Exception as exc:
+      print(
+          f"[Melhor Envio] Falha na requisição de rastreio"
+          f" {pedido.pedido_id}: {exc}"
+      )
+
+  config_atual = STATUS_CONFIG.get(
+      pedido.status, STATUS_CONFIG["aguardando_dados"]
+  )
+
+  return {
+      "pedido_id": pedido.pedido_id,
+      "servico": "Conexão Express",
+      "codigo_rastreio": pedido.codigo_rastreio,
+      "status_atual": pedido.status,
+      "rotulo_etapa": config_atual["rotulo"],
+      "descricao_status": config_atual["descricao"],
+      "cor": config_atual["cor"],
+      "progresso_etapa": config_atual["etapa"],
+      "icone_caminhao": CAMINHAO_ICONE_URL,
+      "local_atual": pedido.local_atual,
+      "ultima_atualizacao": pedido.ultima_atualizacao,
+      "fluxo_status": list(STATUS_CONFIG.keys()),
+  }
